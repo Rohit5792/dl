@@ -1,0 +1,638 @@
+Practical1: Implement a Perceptron from Scratch
+
+# Perceptron for AND gate
+
+# Step activation function
+def step_function(x):
+    return 1 if x >= 0 else 0
+
+# Training data for AND gate
+inputs = [(0, 0), (0, 1), (1, 0), (1, 1)]
+labels = [0, 0, 0, 1]
+
+# Initialize weights and bias
+w1 = 0
+w2 = 0
+bias = 0
+learning_rate = 1
+
+# Training loop
+for epoch in range(10):
+    print(f"\nEpoch {epoch+1}")
+    errors = 0
+
+    for i in range(len(inputs)):
+        x1, x2 = inputs[i]
+        y = labels[i]
+
+        # Calculate linear combination
+        z = w1 * x1 + w2 * x2 + bias
+
+        # Apply activation function
+        y_pred = step_function(z)
+
+        # Calculate error
+        error = y - y_pred
+
+        # Update weights and bias
+        if error != 0:
+            w1 += learning_rate * error * x1
+            w2 += learning_rate * error * x2
+            bias += learning_rate * error
+            errors += 1
+
+        print(f"Input: {x1, x2} → Predicted: {y_pred}, Target: {y}, Weights: ({w1}, {w2}), Bias: {bias}, Errors: {errors}")
+
+    # Stop if no errors (converged)
+    if errors == 0:
+        print("\nTraining complete!")
+        break
+
+# Final model
+print("\nFinal weights and bias:")
+print(f"w1 = {w1}, w2 = {w2}, bias = {bias}")
+
+# Test the final perceptron
+print("\nTesting perceptron:")
+for x1, x2 in inputs:
+    z = w1 * x1 + w2 * x2 + bias
+    y_pred = step_function(z)
+    print(f"Input: ({x1}, {x2}) → Output: {y_pred}")
+
+# Visualization of Decision Bouandry
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Plot points
+for (x1, x2), y in zip(inputs, labels):
+    plt.scatter(x1, x2, c='green' if y==1 else 'red')
+
+# Decision boundary line: w1*x + w2*y + bias = 0 → y = -(w1*x + bias)/w2
+x = np.linspace(-0.5, 1.5, 100)
+y = -(w1 * x + bias) / w2
+plt.plot(x, y, 'b--')
+
+plt.xlabel('x1'); plt.ylabel('x2')
+plt.title('Decision Boundary')
+plt.show()
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+Practical 2: Build and Train a Feedforward Neural Network
+
+# Import necessary libraries
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+
+# 1️⃣ Load the MNIST dataset (handwritten digits)
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+
+# Normalize pixel values from [0,255] to [0,1]
+x_train = x_train / 255.0
+x_test = x_test / 255.0
+
+# 2️⃣ Build the Feedforward Neural Network (MLP)
+model = models.Sequential([
+    layers.Flatten(input_shape=(28, 28)),  # Convert 28x28 image → 784 vector
+    layers.Dense(256, activation='relu'),   # Hidden layer 1
+    layers.Dense(128, activation='relu'),   # Hidden layer 2
+    layers.Dense(10, activation='softmax')  # Output layer (10 classes)
+])
+
+# 3️⃣ Compile the model
+model.compile(
+    optimizer='adam',                      # Optimizer
+    loss='sparse_categorical_crossentropy', # Loss function for integer labels
+    metrics=['accuracy']                    # Metric to monitor
+)
+
+# 4️⃣ Train the model
+history = model.fit(
+    x_train, y_train,
+    epochs=5,               # Train for 5 epochs
+    batch_size=64,          # Use 64 images per training step
+    validation_data=(x_test, y_test)  # Check performance on test data each epoch
+)
+
+# 5️⃣ Evaluate on test data
+test_loss, test_accuracy = model.evaluate(x_test, y_test, verbose=0)
+print(f"\n✅ Test Accuracy: {test_accuracy * 100:.2f}%")
+
+# 6️⃣ Plot training loss and accuracy curves
+plt.figure(figsize=(10,4))
+
+# Plot loss
+plt.subplot(1,2,1)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Test Loss')
+plt.title('Loss Curve')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+
+# Plot accuracy
+plt.subplot(1,2,2)
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Test Accuracy')
+plt.title('Accuracy Curve')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+plt.show()
+----------------------------------------------------------------------------------------------------
+
+Practical 3: Experiment with Regularization Techniques
+
+# Import libraries
+import tensorflow as tf
+from tensorflow.keras import layers, models, regularizers
+import matplotlib.pyplot as plt
+
+# 1️⃣ Load and normalize MNIST dataset
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0
+
+# 2️⃣ Define a helper function to create models
+def create_model(use_l2=False, use_dropout=False):
+    model = models.Sequential()
+    model.add(layers.Flatten(input_shape=(28, 28)))
+
+    # First hidden layer
+    if use_l2:
+        model.add(layers.Dense(256, activation='relu',
+                               kernel_regularizer=regularizers.l2(0.001)))
+    else:
+        model.add(layers.Dense(256, activation='relu'))
+
+    # Dropout layer (optional)
+    if use_dropout:
+        model.add(layers.Dropout(0.3))  # drops 30% of neurons randomly
+
+    # Second hidden layer
+    if use_l2:
+        model.add(layers.Dense(128, activation='relu',
+                               kernel_regularizer=regularizers.l2(0.001)))
+    else:
+        model.add(layers.Dense(128, activation='relu'))
+
+    # Another Dropout if needed
+    if use_dropout:
+        model.add(layers.Dropout(0.3))
+
+    # Output layer
+    model.add(layers.Dense(10, activation='softmax'))
+
+    # Compile model
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+
+# 3️⃣ Create three models
+model_base = create_model()  # no regularization
+model_l2 = create_model(use_l2=True)  # with L2 regularization
+model_dropout = create_model(use_dropout=True)  # with dropout
+
+# 4️⃣ Train all models
+print("Training Base Model...")
+history_base = model_base.fit(x_train, y_train, epochs=5, batch_size=64,
+                              validation_data=(x_test, y_test), verbose=1)
+
+print("\nTraining L2 Regularized Model...")
+history_l2 = model_l2.fit(x_train, y_train, epochs=5, batch_size=64,
+                          validation_data=(x_test, y_test), verbose=1)
+
+print("\nTraining Dropout Model...")
+history_dropout = model_dropout.fit(x_train, y_train, epochs=5, batch_size=64,
+                                    validation_data=(x_test, y_test), verbose=1)
+
+# 5️⃣ Compare accuracy and loss
+plt.figure(figsize=(12,5))
+
+# ---- Loss comparison ----
+plt.subplot(1,2,1)
+plt.plot(history_base.history['val_loss'], label='Base Model')
+plt.plot(history_l2.history['val_loss'], label='L2 Regularization')
+plt.plot(history_dropout.history['val_loss'], label='Dropout')
+plt.title('Validation Loss Comparison')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+
+# ---- Accuracy comparison ----
+plt.subplot(1,2,2)
+plt.plot(history_base.history['val_accuracy'], label='Base Model')
+plt.plot(history_l2.history['val_accuracy'], label='L2 Regularization')
+plt.plot(history_dropout.history['val_accuracy'], label='Dropout')
+plt.title('Validation Accuracy Comparison')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+plt.show()
+
+# 6️⃣ Print final test accuracies
+print(f"\nBase Model Accuracy: {history_base.history['val_accuracy'][-1]*100:.2f}%")
+print(f"L2 Regularized Model Accuracy: {history_l2.history['val_accuracy'][-1]*100:.2f}%")
+print(f"Dropout Model Accuracy: {history_dropout.history['val_accuracy'][-1]*100:.2f}%")
+------------------------------------------------------------------------------------------------------------------
+
+Practical 4: Visualize and Compare Activation Functions
+
+# Import libraries
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+import numpy as np
+import time
+
+# 1️⃣ Load and preprocess MNIST dataset
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0
+
+# 2️⃣ Function to build MLP with a given activation
+def build_mlp(activation_fn):
+    model = models.Sequential([
+        layers.Flatten(input_shape=(28, 28)),
+        layers.Dense(256, activation=activation_fn),
+        layers.Dense(128, activation=activation_fn),
+        layers.Dense(10, activation='softmax')
+    ])
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+# 3️⃣ Create models with different activations
+activations = ['sigmoid', 'tanh', 'relu']
+histories = {}
+train_times = {}
+
+# 4️⃣ Train and time each model
+for act in activations:
+    print(f"\n🔹 Training model with {act.upper()} activation...")
+    model = build_mlp(act)
+    start = time.time()
+    history = model.fit(x_train, y_train,
+                        epochs=5, batch_size=64,
+                        validation_data=(x_test, y_test),
+                        verbose=0)
+    end = time.time()
+
+    train_times[act] = end - start
+    histories[act] = history
+    print(f"{act.upper()} model trained in {train_times[act]:.2f} seconds")
+
+# 5️⃣ Plot Training Loss and Accuracy
+plt.figure(figsize=(12,5))
+
+# Loss comparison
+plt.subplot(1,2,1)
+for act in activations:
+    plt.plot(histories[act].history['val_loss'], label=f'{act.upper()}')
+plt.title('Validation Loss Comparison')
+plt.xlabel('Epoch'); plt.ylabel('Loss')
+plt.legend()
+
+# Accuracy comparison
+plt.subplot(1,2,2)
+for act in activations:
+    plt.plot(histories[act].history['val_accuracy'], label=f'{act.upper()}')
+plt.title('Validation Accuracy Comparison')
+plt.xlabel('Epoch'); plt.ylabel('Accuracy')
+plt.legend()
+
+plt.show()
+
+# 6️⃣ Compare training times
+# Take one batch of data
+x_batch = x_train[:128]
+y_batch = y_train[:128]
+for act in activations:
+    print(f"{act.upper()} training time: {train_times[act]:.2f} seconds")
+
+# Gradient Flow
+activations = ['sigmoid', 'tanh', 'relu']
+plt.figure(figsize=(6,4))
+
+for act in activations:
+    model = build_mlp(act)
+    with tf.GradientTape() as tape:
+        preds = model(x_batch)
+        loss = tf.keras.losses.sparse_categorical_crossentropy(y_batch, preds)
+    grads = tape.gradient(loss, model.trainable_variables)
+    layer_grads = [tf.reduce_mean(tf.abs(g)).numpy() for g in grads if g is not None]
+    plt.plot(layer_grads, marker='o', label=act.upper())
+
+plt.title("Gradient Flow per Layer (Sigmoid vs Tanh vs ReLU)")
+plt.xlabel("Layer Index")
+plt.ylabel("Mean |Gradient|")
+plt.legend()
+plt.show()
+-----------------------------------------------------------------------------------------------
+
+Practical 5: Build a CNN for Image Classification
+
+# Import libraries
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+
+# 1️⃣ Load and preprocess the MNIST dataset
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+
+# CNN expects 4D input: (samples, height, width, channels)
+x_train = x_train.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+x_test = x_test.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+
+# 2️⃣ Data Augmentation (make training data more diverse)
+datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+    rotation_range=10,       # rotate images by 10 degrees
+    width_shift_range=0.1,   # shift left/right by 10%
+    height_shift_range=0.1,  # shift up/down by 10%
+    zoom_range=0.1           # random zoom
+)
+datagen.fit(x_train)
+
+# 3️⃣ Build a Simple CNN model
+
+cnn_model = models.Sequential([
+        layers.Conv2D(32, (3,3), activation='relu', input_shape=(28,28,1)),
+        layers.MaxPooling2D((2,2)),
+        layers.Conv2D(64, (3,3), activation='relu'),
+        layers.MaxPooling2D((2,2)),
+        layers.Flatten(),
+        layers.Dense(128, activation='relu'),
+        layers.Dense(10, activation='softmax')
+    ])
+cnn_model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+
+cnn_model.summary()
+
+# 4️⃣ Train the CNN using augmented data
+history_cnn = cnn_model.fit(
+    datagen.flow(x_train, y_train, batch_size=64),
+    epochs=5,
+    validation_data=(x_test, y_test)
+)
+
+# 5️⃣ Build and Train a Simple MLP (for comparison)
+mlp_model = models.Sequential([
+    layers.Flatten(input_shape=(28,28,1)),
+    layers.Dense(256, activation='relu'),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(10, activation='softmax')
+])
+mlp_model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+history_mlp = mlp_model.fit(
+    x_train, y_train, epochs=5, batch_size=64,
+    validation_data=(x_test, y_test)
+)
+
+# 6️⃣ Plot accuracy and loss curves
+plt.figure(figsize=(12,5))
+
+# Accuracy
+plt.subplot(1,2,1)
+plt.plot(history_mlp.history['val_accuracy'], label='MLP')
+plt.plot(history_cnn.history['val_accuracy'], label='CNN')
+plt.title('Validation Accuracy')
+plt.xlabel('Epoch'); plt.ylabel('Accuracy')
+plt.legend()
+
+# Loss
+plt.subplot(1,2,2)
+plt.plot(history_mlp.history['val_loss'], label='MLP')
+plt.plot(history_cnn.history['val_loss'], label='CNN')
+plt.title('Validation Loss')
+plt.xlabel('Epoch'); plt.ylabel('Loss')
+plt.legend()
+
+plt.show()
+
+# 7️⃣ Evaluate both models
+mlp_acc = mlp_model.evaluate(x_test, y_test, verbose=0)[1] * 100
+cnn_acc = cnn_model.evaluate(x_test, y_test, verbose=0)[1] * 100
+
+print(f"\nMLP Accuracy: {mlp_acc:.2f}%")
+print(f"CNN Accuracy: {cnn_acc:.2f}%")
+--------------------------------------------------------------------------------------
+
+Practical 6: Implement an RNN or LSTM for Text Classification
+
+# 1️⃣ Import Libraries
+import tensorflow as tf
+from tensorflow.keras import layers, models, preprocessing
+import matplotlib.pyplot as plt
+import numpy as np
+
+# 2️⃣ Load IMDB dataset
+# Each review is already tokenized into integers representing words
+vocab_size = 10000  # keep top 10,000 most common words
+max_length = 200    # pad or truncate reviews to 200 words
+
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.imdb.load_data(num_words=vocab_size)
+
+# Pad sequences to make all reviews the same length
+x_train = tf.keras.preprocessing.sequence.pad_sequences(x_train, maxlen=max_length)
+x_test = tf.keras.preprocessing.sequence.pad_sequences(x_test, maxlen=max_length)
+
+# 3️⃣ Build the LSTM Model
+model = models.Sequential([
+    layers.Embedding(input_dim=vocab_size, output_dim=64, input_length=max_length),
+    layers.LSTM(64, return_sequences=False),
+    layers.Dense(64, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(1, activation='sigmoid')  # output: probability of positive sentiment
+])
+
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+model.summary()
+
+# 4️⃣ Train the Model
+history = model.fit(x_train, y_train,
+                    epochs=5,
+                    batch_size=64,
+                    validation_data=(x_test, y_test))
+
+# 5️⃣ Plot Training and Validation Curves
+plt.figure(figsize=(12,5))
+
+# Accuracy curve
+plt.subplot(1,2,1)
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Accuracy Curve')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+# Loss curve
+plt.subplot(1,2,2)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Loss Curve')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+
+plt.show()
+
+# 6️⃣ Evaluate the model
+loss, acc = model.evaluate(x_test, y_test, verbose=0)
+print(f"\n✅ Test Accuracy: {acc*100:.2f}%")
+
+# 7️⃣ Visualize Example Predictions
+word_index = tf.keras.datasets.imdb.get_word_index()
+reverse_word_index = {v+3: k for k, v in word_index.items()}
+reverse_word_index[0], reverse_word_index[1], reverse_word_index[2] = '<PAD>', '<START>', '<UNK>'
+
+def decode_review(encoded_review):
+    return ' '.join([reverse_word_index.get(i, '?') for i in encoded_review])
+
+# Pick a few random reviews to test
+for i in range(3):
+    idx = np.random.randint(0, len(x_test))
+    review = decode_review(x_test[idx])
+    pred = model.predict(np.array([x_test[idx]]))[0][0]
+    sentiment = "😊 Positive" if pred > 0.5 else "😡 Negative"
+    print(f"\nReview {i+1}: {review[:300]}...")
+    print(f"Predicted Sentiment: {sentiment} (Confidence: {pred:.2f})")
+------------------------------------------------------------------------------------------------------------
+
+Practical 7: Transfer Learning with a Pretrained CNN o Load a pretrained model (e.g., ResNet50 or VGG16).
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import matplotlib.pyplot as plt
+
+train_dir = r'C:\Users\Advik Gahukar\Downloads\cats_and_dogs_filtered\cats_and_dogs_filtered\train'
+val_dir = r'C:\Users\Advik Gahukar\Downloads\cats_and_dogs_filtered\cats_and_dogs_filtered\validation'
+
+train_gen = tf.keras.preprocessing.image.ImageDataGenerator().flow_from_directory(train_dir, target_size=(150,150), batch_size=32, class_mode='binary')
+val_gen =  tf.keras.preprocessing.image.ImageDataGenerator().flow_from_directory(val_dir, target_size=(150,150), batch_size=32, class_mode='binary')
+
+# Load pretrained VGG16 without top classifier layers
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(150,150,3))
+
+# Freeze the convolutional base
+for layer in base_model.layers:
+    layer.trainable = False
+
+model = models.Sequential([
+    base_model,
+    layers.Flatten(),
+    layers.Dense(256, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(1, activation='sigmoid')  # binary classification (cat/dog)
+])
+
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+history_frozen = model.fit(
+    train_gen,
+    epochs=3,
+    validation_data=val_gen
+)
+
+# Unfreeze last 4 layers for fine-tuning
+for layer in base_model.layers[-4:]:
+    layer.trainable = True
+
+model.compile(optimizer=tf.keras.optimizers.Adam(1e-5),  # smaller LR
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+history_finetune = model.fit(
+    train_gen,
+    epochs=3,
+    validation_data=val_gen
+)
+
+plt.figure(figsize=(10,5))
+plt.plot(history_frozen.history['val_accuracy'], label='Frozen Base')
+plt.plot(history_finetune.history['val_accuracy'], label='Fine-tuned')
+plt.title('Validation Accuracy Comparison')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+-----------------------------------------------------------------------------------------------------------
+
+Practical 8: Hyperparameter Tuning and Model Comparison
+
+# 8️⃣ Practical – Hyperparameter Tuning and Model Comparison
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import datetime
+
+# 1️⃣ Load and prepare dataset (MNIST handwritten digits)
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0  # Normalize to [0,1]
+
+# 2️⃣ Define a simple function to create a model
+def create_model(num_layers=2, learning_rate=0.001):
+    model = models.Sequential()
+    model.add(layers.Flatten(input_shape=(28, 28)))  # Convert 2D image to 1D vector
+
+    # Add hidden layers based on num_layers
+    for _ in range(num_layers):
+        model.add(layers.Dense(128, activation='relu'))
+
+    # Output layer (10 classes for digits 0–9)
+    model.add(layers.Dense(10, activation='softmax'))
+
+    # Compile model
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+# 3️⃣ Define hyperparameter configurations to test
+configs = [
+    {"name": "LR_0.001_BS_32_2Layers", "lr": 0.001, "batch_size": 32, "layers": 2},
+    {"name": "LR_0.01_BS_32_2Layers", "lr": 0.01, "batch_size": 32, "layers": 2},
+    {"name": "LR_0.001_BS_64_3Layers", "lr": 0.001, "batch_size": 64, "layers": 3},
+]
+
+# 4️⃣ Train and log each configuration to TensorBoard
+for cfg in configs:
+    print(f"\n🔹 Training: {cfg['name']}")
+
+    model = create_model(num_layers=cfg["layers"], learning_rate=cfg["lr"])
+
+    # TensorBoard log directory (each run gets a unique folder)
+    log_dir = "logs/" + cfg["name"] + "_" + datetime.datetime.now().strftime("%H-%M-%S")
+    tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=log_dir)
+
+    history = model.fit(
+        x_train, y_train,
+        validation_data=(x_test, y_test),
+        epochs=5,
+        batch_size=cfg["batch_size"],
+        callbacks=[tensorboard_cb],
+        verbose=1
+    )
+
+    # Evaluate
+    test_loss, test_acc = model.evaluate(x_test, y_test, verbose=0)
+    print(f"✅ Final Test Accuracy ({cfg['name']}): {test_acc*100:.2f}%")
+
+print("\n✨ Training complete! Open TensorBoard to compare runs:")
+print("➡ Run this command in terminal: tensorboard --logdir=logs")
+
+%load_ext tensorboard
+%tensorboard --logdir logs
